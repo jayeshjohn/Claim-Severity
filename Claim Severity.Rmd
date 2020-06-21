@@ -1,12 +1,35 @@
+---
+title: "Claim Severity"
+author: "Jayesh John"
+date: "6/21/2020"
+output: pdf_document
+urlcolor: blue
+toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Preface
+This data science project is part of 'Choose Your Own!' *HarvardX: PH125.9x* course, towards HarvardX Professional Certificate in Data Science. The overall purpose of this project is to apply R data analysis and Machine Learning skills to a real-world problems. I have chosen 'Allstate Claim Severity' for this project as it closely matches with my experience and domain expertise in the field of Property and Casualty Insurance.
+
+# Introduction
+
+When you’ve been devastated by a serious car accident, your focus is on the things that matter the most: family, friends, and other loved ones. Pushing paper with your insurance agent is the last place you want your time or mental energy spent. *Allstate*, a personal insurer in the United States, continually seeks fresh ideas to improve their claims service for the over 16 million households they protect.
+
+In 2016, *Allstate* posted an open challenge to develop automated methods of predicting the cost, and hence severity, of claims. The objective is to create an algorithm that accurately predicts claims severity or 'loss'. Allstate provided the dataset where each row in the dataset represents an insurance claim.  
+
+For this project, we will be creating Machine Learning models to predict the 'loss' of insurance claims. The target is to predict the value for the 'loss' column and measure the performance of the models using MAE (Mean Absolute Error).
+
+# The Claim Severity Dataset 
+
+## Load Libraries and Dataset
+
+The Claim Severity dataset is provided by Allstate. It is a masked dataset having variables prefaced with 'cat' denoting categorical, and prefaced with 'cont' denoting continuous.
+
+```{r load libraries data, message=FALSE, warning=FALSE, eval = TRUE}
+
 ############################# ALLSTATE Claim Severity ###############################
-#####################################################################################
-### This script is divided into 5 parts:
-#   1) Load the libraries and read the CSV dataset
-#   2) Visualization on dataset features - Categorical and Continuous Columns
-#   3) Apply PCA transformation based on column levels
-#   4) Create Train and Test partitions on PCA transformed and Raw dataset
-#   5) Prediction Modeling and compare MAE for each of the Models
-#####################################################################################
 
 #####################################################################################
 # Step 1: Load the libraries and read the CSV dataset
@@ -37,17 +60,31 @@ range(raw_data$loss)
 
 # remove ID column from training set as it is not needed for training
 raw_data$id <- NULL
+```
+
+## Tidy View of Data
+
+Claim Severity dataset has 188318 rows with each row representing a customer claim and the loss. The dataset has 132 columns or features.
+
+```{r Tidy View, message=FALSE, warning=FALSE, eval = TRUE} 
 
 # see 'Claim Severity' dataset in tidy format
 raw_data %>% tibble()
+```
 
+## Data Exploration and Visualization
+
+The dataset features are divided into *Categorical* and *Continuous*. There are 116 Categorical variables, 14 Continuous variables and a target loss Continuous variable.
+
+We look at the Continuous variable density distribution and the distribution with the log(loss) using ggplot. The log of loss is taken considering the skewed distribution and to eliminate the outliers.
+
+```{r data visualisation, message=FALSE, warning=FALSE, eval = TRUE} 
 #####################################################################################
 # Step 2: Visualization on dataset features - Categorical and Continuous fields
 #####################################################################################
 
 # Plot Loss
-plot(x = 1:nrow(raw_data), y = raw_data$loss, type = "h", main = "Loss Plot", 
-     xlab = "Row Number", ylab = "Loss", col = viridis(100))
+plot(x = 1:nrow(raw_data), y = raw_data$loss, type = "h", main = "Loss Plot", xlab = "Row Number", ylab = "Loss", col = viridis(20))
 
 ## Split the dataset having Categorical and Continuous fields
 cont_fields <- raw_data[, -grep("^cat", colnames(raw_data))]
@@ -74,6 +111,17 @@ cont_fields %>%
   theme(legend.position = "bottom") +
   facet_wrap(~ var, scales = "free", ncol = 3)
 
+```
+
+We notice that some of the Continuous variables like the Cat2, Cat3 appears to be variables that were originally Categorical. 
+
+## Data Correlation
+
+Using one single value, Data Correlation describes the *degree of relationship* between two variables. Correlation ranges from -1 to +1. Negative values of correlation indicate that as one variable increases the other variable decreases.  Positive values of correlation indicate that as one variable increase the other variable increases as well. Pearson's measures the linear relationship between two variables.
+
+Data Correlation on Continuous variables is shown by the below Corrplot:
+
+```{r data preprocessing, message=FALSE, warning=FALSE, eval = TRUE} 
 
 ### Data Pre-Processing
 
@@ -89,6 +137,19 @@ subset(corr.df[order(-abs(corr.df$Freq)),], (abs(Freq) > 0.8 & abs(Freq) < 1))
 # Removing Variables with correlations greater than 80% - cont 9, cont 10, cont12, cont13
 cont_vars_all <- cont_fields[,-c(9,10,12,13)]
 
+```
+
+After filtering for highly correlated pairs (cont9, cont10, cont12, cont13), we remove them to optimize the overall features and to help with linear regression models.
+
+# PCA (Principal Component Analysis)
+
+Since we have large number of features, we look at ways to reduce the feature dimension list to help with the modeling and reduce the computation time. 
+
+The central idea of principal component analysis (PCA) is to reduce the dimensionality of a data set consisting of a large number of interrelated variables while retaining as much as possible of the variation present in the data set. This is achieved by transforming to a new set of variables, the principal components (PCs), which are uncorrelated, and which are ordered so that the first few retain most of the variation present in all of the original variables.
+
+PCA transformation will be applied on Categorical variables by splitting into three based on the levels. The below bar plot will provide a view of various levels within the categorical variables:
+
+```{r Levels, warning = FALSE, message = FALSE}
 #####################################################################################
 # Step 3: Apply Principal Component Analysis (PCA) transformation based on levels
 #####################################################################################
@@ -104,6 +165,11 @@ cat_data_levels <- sapply(seq(1, ncol(cat_fields)), function(d){
 barplot(cat_data_levels, type = "l", ylab="Cat Column Levels", 
         xlab = "Cat Column Index", col = viridis(117))
 
+```
+
+As we see, we have binary levels on 72 Columns and multiple > 2 levels on rest of the columns. We split the Categorical Columns into three based on the levels for applying PCA:
+
+```{r PCA, warning = FALSE, message = FALSE}
 
 ##############################################################################
 ## We split the Categorical columns into three:
@@ -113,7 +179,6 @@ barplot(cat_data_levels, type = "l", ylab="Cat Column Levels",
 #############################################################################
 
 ## 1. PCA on Categorical Variables Binary: 2 Levels
-
 # Extracting the binary variables from all_data
 binary_all <- cat_fields[,1:72]
 
@@ -124,22 +189,17 @@ binaryNum_all <- binary_all %>% mutate_if(is.factor,as.numeric)
 pca_all <- princomp(binaryNum_all, cor = TRUE, scores = TRUE)
 
 # Choose 25 PCA Scores
-summary(pca_all)
 Binary_vars_all <- as.data.frame(pca_all$scores[,1:25])
 
-## 2. PCA on Categorical Variables: 3-9 Levels
 
+## 2. PCA on Categorical Variables: 3-9 Levels
 # Extracting the 3-9 level categorical variables from the whole dataset
 
 # Creating two categories 
 cat1_all <- cat_fields[ ,73:88]
-#cat2_all <- cat_fields[ ,c(89:98, 30)]
 cat2_all <- cat_fields[ ,89:98]
 
-
 # Running pca on both categories separately 
-#pca_cat1_all <- PCAmix(X.quali = cat1_all, ndim = 30, rename.level = TRUE)
-#pca_cat2_all <- PCAmix(X.quali = cat2_all, ndim = 50, rename.level = TRUE)
 pca_cat1_all <- PCAmix(X.quali = cat1_all, ndim = 15, rename.level = TRUE, graph = FALSE)
 pca_cat2_all <- PCAmix(X.quali = cat2_all, ndim = 10, rename.level = TRUE)
 
@@ -149,10 +209,8 @@ cat2_vars_all <- data.frame(pca_cat2_all$scores)
 
 # Changing the column names so as to not mix with cat1 variables 
 colnames(cat2_vars_all) <- paste("cat", colnames(cat2_vars_all), sep = "_")
-colnames(cat2_vars_all)
 
 ## 3. PCA on Categorical Variables: >9 Levels
-
 #extracting all more than 9 level variables and converting them into numeric values 
 high_level_vars_all <- cat_fields[,99:116]
 
@@ -166,16 +224,37 @@ ncol(final.dataset.all)
 
 # We see that the data features are transformed into 79 Rows including Loss
 
+```
+
+We transformed the 116 dimensions into 79 dimensions using PCA. This can be further reduced based on the *Cumulative Proportion* derived from the PCA and choosing the variables.
+
+For example, notice that we choose 25 PCA dimensions from the 72 binary variables. The 25 dimensions corresponds to a Cumulative Proportion of 0.57. 
+
+We will test our models using PCA transformed data having the reduced dimension as well as with the raw data. 
+
+
+# Machine Learning Data Modeling
+
+## Train and Test Datasets 
+
+The following code is used to generate *Train* and *Test* sets in the ratio 7:3. The Models are trained using the *Train* set. The prediction accuracy of the models are further tested using the *Test* set and MAE determined. 
+
+Note that we create two sets of datasets, one having PCA transformed dimensional data and the raw data. We will finally evaluate how these fit in our models. 
+We also convert the raw data with categorical variables into numeric in order to apply xgBoost models.
+
+```{r train test, warning = FALSE, message = FALSE}
 #####################################################################################
 # Step 4: Create Train and Test partitions on PCA transformed and Raw dataset
 #####################################################################################
 
-set.seed(500)
 
-# Raw Data - splitting datasets into 2 - train and test
+# Convert Categorical variables into Numeric data type
 raw_data_fac <- raw_data %>% mutate_if(is.character,as.factor)
 raw_data_num <- raw_data_fac %>% mutate_if(is.factor,as.numeric)
 
+set.seed(500)
+
+# Raw Data - splitting datasets into 2 - train and test
 raw_train_index <- createDataPartition(raw_data_num$loss, p = .7, list = FALSE, times =1)
 raw_tr <- raw_data_num[raw_train_index,]
 raw_ts <- raw_data_num[-raw_train_index,]
@@ -184,11 +263,14 @@ raw_ts <- raw_data_num[-raw_train_index,]
 train_index <- createDataPartition(final.dataset.all$loss, p = .7, list = FALSE, times =1)
 tr <- final.dataset.all[train_index,]
 ts <- final.dataset.all[-train_index,]
+```
 
-# PCA Minimal Cols
-#pca_train_index <- createDataPartition(data_pca_all$loss, p = .7, list = FALSE, times =1)
-#pca_tr <- data_pca_all[pca_train_index,]
-#pca_ts <- data_pca_all[-pca_train_index,]
+
+## Model 1: The Average Model
+
+ Let's start by building the simplest possible model: we predict the same loss (the Mean loss value) for all claims regardless of the features. We will set this as our baseline to evaulate further models.
+ 
+```{r Average Model, warning = FALSE, message = FALSE} 
 
 #####################################################################################
 # Step 5: Prediction Modeling and compare MAE for each of the Models
@@ -213,6 +295,14 @@ avgmodel_mae <- df1$MAE
 mae_results <- data.frame(Method = "The Average Model", MAE = avgmodel_mae) 
 mae_results %>% knitr::kable() 
 
+```
+
+## Model 2: Linear Regression with PCA
+
+ We now apply Linear Regression on PCA transformed dataset with loss as the predictor variable. Mathematically a linear relationship represents a straight line when plotted as a graph. 
+
+```{r LinearReg PCA, message=FALSE, warning=FALSE} 
+
 ######################################################
 ### MODEL 2: Linear Regression with PCA data
 ######################################################
@@ -230,6 +320,16 @@ mae_results <- bind_rows(mae_results,
                          data_frame(Method="Linear Regression Model - PCA",   
                                     MAE = linear_reg_pca_mae)) 
 mae_results %>% knitr::kable() 
+
+
+```
+
+
+## Model 3: Linear Regression with Raw Data
+
+ The third model applies the Linear regression on the raw numeric dataset. 
+
+```{r Linearreg Raw, message=FALSE, warning=FALSE} 
 
 ######################################################
 ### MODEL 3: Linear Regression with Raw data
@@ -250,6 +350,19 @@ mae_results <- bind_rows(mae_results,
 mae_results %>% knitr::kable()
 
 
+```
+ 
+
+## Model 4: xgBoost Model - Using PCA Data
+
+ For the next model we choose xgBoost to further improve from our Linear Regression models. Considering the data dimensions and the complexity of the dataset and the need for computational efficiency, this model will be best suited. We apply xgBoost algorithm on numeric variables. 
+ 
+ Xgboost is short for *eXtreme Gradient Boosting* package. It has both linear model solver and tree learning algorithms. The capacity to do parallel computation on a single machine makes it fast. Since it works only with numeric vectors, we converted our raw dataset into numeric. We first apply the model on PCA transformed dataset.
+ 
+ The model is best tuned to reduce the MAE. The value of nrounds is chosen based on the value that minimized the MAE during the execution. We use xgb.cv function to determine the best nrounds. For the PCA data the best nround is determined to be *1101* and we use that value during xgb.train.
+
+```{r xgBoost PCA, message=FALSE, warning=FALSE} 
+
 ######################################################
 ### MODEL 4: xgBoost Model - Using PCA Data
 ######################################################
@@ -262,15 +375,15 @@ ts_label <- ts$loss
 
 # Plotting the histogram to check the distribution
 hist(tr_label, main="Histogram of Loss", xlab="Loss",col = viridis(10))
-hist(ts_label, main="Histogram of Loss", xlab="Loss",col = viridis(10))
+#hist(ts_label, main="Histogram of Loss", xlab="Loss",col = viridis(10))
 
-# Feature engineering- transforming the loss variable to obtain normal-like distribution
+# Feature engineering - transforming the loss variable to obtain normal-like distribution
 tr_label_log <- log(tr$loss + 200)
 ts_label_log <- log(ts$loss + 200)
 
 # Plotting the histogram to check the new distribution
 hist(tr_label_log, main="Histogram of Log(Loss)", xlab="Log(Loss)",col = viridis(20))
-hist(ts_label_log, main="Histogram of Log(Loss)", xlab="Log(Loss)",col = viridis(20))
+#hist(ts_label_log, main="Histogram of Log(Loss)", xlab="Log(Loss)",col = viridis(20))
 
 # Converting the train and test dataframes to a matrix
 tr_matrix <- as.matrix(tr, rownames.force = NA)
@@ -294,26 +407,25 @@ params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, n
                prediction = TRUE, alpha=1)
 
 # Using the xgb.cv function to calculate the best nround for this model. 
+# Note that we intentionally used nrounds = 3 inorder to save some computational time, but for xgb.train we use the optimal nround value of 1101.
 
-xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 20, nfold = 5, 
-                 showsd = T, stratified = T, print_every_n = 10, maximize = F,
+xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 3, nfold = 5, 
+                 showsd = T, stratified = T, print_every_n = 100, maximize = F,
                  verbose = TRUE)
 
 
 # Finding the best nrounds value
-xgbcv$best_iteration
-
-
+#xgbcv$best_iteration
 # Training the model on the best tuning parameters with nrounds = 1101. 
 # This value is derived based on prior tuning and using it directly on train to save some computation time.
+
 xgb1 <- xgb.train (params = params, 
                    data = dtrain, 
                    nrounds = 1101, 
                    watchlist = list(val=dtest,train=dtrain), 
-                   print_every_n = 10, 
+                   print_every_n = 100, 
                    verbose = TRUE,
                    maximize = F)
-
 
 # Model prediction
 xgbpred <- predict(xgb1,dtest)
@@ -328,10 +440,19 @@ xboost_mae <- df4$MAE
 
 # Add MAE results in the table 
 mae_results <- bind_rows(mae_results, 
-                         data_frame(Method="xBoost Model - PCA",   
+                         data_frame(Method="xgBoost Model - PCA",   
                                     MAE = xboost_mae)) 
 mae_results %>% knitr::kable() 
 
+```
+
+We see a significant improvement from our prior models.
+
+## Model 5: xgBoost Model - Using Raw Data
+
+ As a final step we apply xgBoost on the raw numeric datset. We use xgb.cv function to determine the best nrounds. For the raw numeric data the best nround is determined to be *1181* and we use this value during xgb.train.
+ 
+``` {r xgBoost Raw, warning = FALSE, message = FALSE} 
 
 ######################################################
 ### MODEL 5: xgBoost Model - Using Numeric Raw Data
@@ -367,22 +488,21 @@ params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, n
                early_stopping_rounds = 25, eval_metric = "mae", lambda=0, alpha=1)
 
 # Using the xgb.cv function to calculate the best nround for this model. 
+# Note that we intentionally use nrounds = 3 inorder to save some computational time, but for xgb.train we use the optimal nround value of 1181 determined during prior execution.
 
-xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 20, nfold = 5, 
-                 showsd = T, stratified = T, print_every_n = 10, maximize = F)
+xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 3, nfold = 5, 
+                 showsd = T, stratified = T, print_every_n = 100, maximize = F)
 
 # finding the best nrounds value
-xgbcv
-xgbcv$best_iteration
-
-
+#xgbcv$best_iteration
 # Training the model on the best tuning parameters with nrounds = 1181. 
 # This value is derived based on prior tuning and using it directly on train to save some computation time.
+
 xgb1 <- xgb.train (params = params, 
                    data = dtrain, 
                    nrounds = 1181, 
                    watchlist = list(val=dtest,train=dtrain), 
-                   print_every_n = 10,
+                   print_every_n = 100,
                    verbose = TRUE,
                    maximize = F)
 
@@ -399,9 +519,52 @@ xboost_raw_mae <- df5$MAE
 
 # Add MAE results in the table 
 mae_results <- bind_rows(mae_results, 
-                         data_frame(Method="xBoost Model - Raw",   
+                         data_frame(Method="xgBoost Model - Raw",   
                                     MAE = xboost_raw_mae)) 
+
+```
+
+
+
+# Results 
+ 
+
+ We can inspect the MAEs for the various model trained from naive approach using the Average, to the xgBoost approach.  
+
+ The MAE result table for various models are as follows: 
+ 
+
+``` {r mae results, message = FALSE, warning = FALSE, echo = FALSE} 
 mae_results %>% knitr::kable()
+ 
+
+```
+
+ As we see from the table, the MAEs of each model is an improvement from the previous models, with the last model having an MAE ~ 1153.6. This is obviously a significant improvement from the first naive model. 
+ 
+
+# Conclusion 
+ 
+
+ Accurate prediction of 'loss' holds key importance for Insurance companies, as it helps drive key business decisions and help reduce potential claim processing delays caused during the claims process. It can also help automate some of the manual review and claim adjudication steps reducing the overall claim processing lead time. This will ultimately hold a real value to end customers leading to better customer experience.
+ 
+  The application of xgBoost model on raw numeric data achieved the best MAE results. Although PCA data based models yielded slightly less performance, the concept can be applied on multiple scenarios to reduce the data dimension and improve computational and model efficiencies. 
+
+## Future Impovement
+
+ Further improvements can be made to the models if we have the knowledge of the complete data features. For example Demographic information of the Insured, Driving History, Loss by State, date and time etc. will help apply domain knowledge for the modeling. Alternate models like Neural Networks can be looked at, but with the cost of high computational expense.
 
 
-################################# End of Script ################################
+### References 
+ 
+
+[https://rafalab.github.io/dsbook]()  
+ 
+[https://www.kaggle.com/c/allstate-claims-severity/overview]()  
+
+[https://github.com/jayeshjohn/Claim-Severity]()
+
+[https://raw.githubusercontent.com/jayeshjohn/Claim-Severity/master/Claim%20Severity.csv]()
+
+
+
