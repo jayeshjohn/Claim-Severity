@@ -47,7 +47,7 @@ raw_data %>% tibble()
 
 # Plot Loss
 plot(x = 1:nrow(raw_data), y = raw_data$loss, type = "h", main = "Loss Plot", 
-     xlab = "Row Number", ylab = "Loss", col = viridis(100))
+     xlab = "Row Number", ylab = "Loss", col = viridis(nrow(raw_data)))
 
 ## Split the dataset having Categorical and Continuous fields
 cont_fields <- raw_data[, -grep("^cat", colnames(raw_data))]
@@ -64,16 +64,15 @@ cont_fields %>%
   theme_minimal()
 
 # Continuous Variable Distribution with Loss
-cont_fields %>% 
+# To reduce the plot size we use the 10000 rows
+cont_fields_plot <- cont_fields[1:10000,]
+cont_fields_plot %>% 
   gather(-loss, key = "var", value = "value") %>% 
   ggplot(aes(x = value, y = log(loss))) +
-  geom_point(fill = "RED", size=1, alpha=0.3) +
+  geom_point(size=1, alpha=0.3) +
   geom_smooth(method = lm) +
-  scale_color_viridis(option = "D")+
-  theme_minimal() +
   theme(legend.position = "bottom") +
   facet_wrap(~ var, scales = "free", ncol = 3)
-
 
 ### Data Pre-Processing
 
@@ -100,10 +99,10 @@ cat_fields <- cat_fields %>% mutate_if(is.character,as.factor)
 cat_data_levels <- sapply(seq(1, ncol(cat_fields)), function(d){
   length(levels(cat_fields[,d]))
 })
+
 # Plot the cat data levels
 barplot(cat_data_levels, type = "l", ylab="Cat Column Levels", 
         xlab = "Cat Column Index", col = viridis(117))
-
 
 ##############################################################################
 ## We split the Categorical columns into three:
@@ -295,8 +294,8 @@ params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, n
 
 # Using the xgb.cv function to calculate the best nround for this model. 
 
-xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 20, nfold = 5, 
-                 showsd = T, stratified = T, print_every_n = 10, maximize = F,
+xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 1500, nfold = 5, 
+                 showsd = T, stratified = T, print_every_n = 100, maximize = F,
                  verbose = TRUE)
 
 
@@ -310,7 +309,7 @@ xgb1 <- xgb.train (params = params,
                    data = dtrain, 
                    nrounds = 1101, 
                    watchlist = list(val=dtest,train=dtrain), 
-                   print_every_n = 10, 
+                   print_every_n = 100, 
                    verbose = TRUE,
                    maximize = F)
 
@@ -339,7 +338,7 @@ mae_results %>% knitr::kable()
 
 #### Model preparation ####
 
-# Extracting the loss variable from the training set 
+# Extracting the loss variable from the training set
 tr_label <- raw_tr$loss
 ts_label <- raw_ts$loss
 
@@ -359,7 +358,7 @@ ts_sparse <- as(ts_matrix, "sparseMatrix")
 dtrain <- xgb.DMatrix(data = tr_sparse[,1:130], label = tr_label_log )
 dtest <- xgb.DMatrix(data = ts_sparse[,1:130], label = ts_label_log )
 
-## preparation for xgboost model 
+## preparation for xgboost model
 
 #defining default parameters
 params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, nthread = 8,
@@ -368,11 +367,10 @@ params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, n
 
 # Using the xgb.cv function to calculate the best nround for this model. 
 
-xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 20, nfold = 5, 
-                 showsd = T, stratified = T, print_every_n = 10, maximize = F)
+xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 1500, nfold = 5, 
+                 showsd = T, stratified = T, print_every_n = 100, maximize = F)
 
 # finding the best nrounds value
-xgbcv
 xgbcv$best_iteration
 
 
@@ -382,7 +380,7 @@ xgb1 <- xgb.train (params = params,
                    data = dtrain, 
                    nrounds = 1181, 
                    watchlist = list(val=dtest,train=dtrain), 
-                   print_every_n = 10,
+                   print_every_n = 100,
                    verbose = TRUE,
                    maximize = F)
 

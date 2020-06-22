@@ -21,7 +21,7 @@ In 2016, *Allstate* posted an open challenge to develop automated methods of pre
 
 For this project, we will be creating Machine Learning models to predict the 'loss' of insurance claims. The target is to predict the value for the 'loss' column and measure the performance of the models using MAE (Mean Absolute Error).
 
-# The Claim Severity Dataset 
+# The Claim Severity Dataset
 
 ## Load Libraries and Dataset
 
@@ -50,7 +50,8 @@ if(!require(viridis)) install.packages("viridis", repos = "http://cran.us.r-proj
 
 
 # Read the CSV file and Load the data:
-raw_data <- read.csv("https://raw.githubusercontent.com/jayeshjohn/Claim-Severity/master/Claim%20Severity.csv")
+raw_data <- 
+  read.csv("https://raw.githubusercontent.com/jayeshjohn/Claim-Severity/master/Claim%20Severity.csv")
 
 # Check the dataset dimensions and Loss SD, Mean, Range
 dim(raw_data)
@@ -64,7 +65,8 @@ raw_data$id <- NULL
 
 ## Tidy View of Data
 
-Claim Severity dataset has 188318 rows with each row representing a customer claim and the loss. The dataset has 132 columns or features.
+Claim Severity dataset has 188318 rows with each row representing a customer claim and the loss.
+The dataset has 132 columns or features.
 
 ```{r Tidy View, message=FALSE, warning=FALSE, eval = TRUE} 
 
@@ -84,7 +86,8 @@ We look at the Continuous variable density distribution and the distribution wit
 #####################################################################################
 
 # Plot Loss
-plot(x = 1:nrow(raw_data), y = raw_data$loss, type = "h", main = "Loss Plot", xlab = "Row Number", ylab = "Loss", col = viridis(20))
+plot(x = 1:nrow(raw_data), y = raw_data$loss, type = "h", main = "Loss Plot", 
+     xlab = "Row Number", ylab = "Loss", col = viridis(nrow(raw_data)))
 
 ## Split the dataset having Categorical and Continuous fields
 cont_fields <- raw_data[, -grep("^cat", colnames(raw_data))]
@@ -101,19 +104,19 @@ cont_fields %>%
   theme_minimal()
 
 # Continuous Variable Distribution with Loss
-cont_fields %>% 
+# To reduce the plot size we use 10000 rows
+cont_fields_plot <- cont_fields[1:10000,]
+cont_fields_plot %>% 
   gather(-loss, key = "var", value = "value") %>% 
   ggplot(aes(x = value, y = log(loss))) +
-  geom_point(fill = "RED", size=1, alpha=0.3) +
+  geom_point(size=1, alpha=0.3) +
   geom_smooth(method = lm) +
-  scale_color_viridis(option = "D")+
-  theme_minimal() +
   theme(legend.position = "bottom") +
   facet_wrap(~ var, scales = "free", ncol = 3)
 
 ```
 
-We notice that some of the Continuous variables like the Cat2, Cat3 appears to be variables that were originally Categorical. 
+We notice that some of the Continuous variables like cat2 appears to be variables that were originally Categorical. 
 
 ## Data Correlation
 
@@ -134,7 +137,7 @@ corrplot(corr, method = "circle", order = "hclust", type = "lower", diag = FALSE
 corr.df <- as.data.frame(as.table(corr))
 subset(corr.df[order(-abs(corr.df$Freq)),], (abs(Freq) > 0.8 & abs(Freq) < 1))
 
-# Removing Variables with correlations greater than 80% - cont 9, cont 10, cont12, cont13
+# Removing Variables with correlations greater than 80% - cont9, cont10, cont12, cont13
 cont_vars_all <- cont_fields[,-c(9,10,12,13)]
 
 ```
@@ -161,6 +164,7 @@ cat_fields <- cat_fields %>% mutate_if(is.character,as.factor)
 cat_data_levels <- sapply(seq(1, ncol(cat_fields)), function(d){
   length(levels(cat_fields[,d]))
 })
+
 # Plot the cat data levels
 barplot(cat_data_levels, type = "l", ylab="Cat Column Levels", 
         xlab = "Cat Column Index", col = viridis(117))
@@ -219,7 +223,8 @@ high_level_vars_all <- high_level_vars_all %>% mutate_if(is.character,as.factor)
 high_level_vars_numeric_all <- high_level_vars_all %>% mutate_if(is.factor,as.numeric)
 
 # final dataset
-final.dataset.all <- cbind(Binary_vars_all, cat1_vars_all, cat2_vars_all, high_level_vars_numeric_all, cont_vars_all)
+final.dataset.all <- cbind(Binary_vars_all, cat1_vars_all, cat2_vars_all,
+                           high_level_vars_numeric_all, cont_vars_all)
 ncol(final.dataset.all)
 
 # We see that the data features are transformed into 79 Rows including Loss
@@ -406,8 +411,9 @@ params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, n
                early_stopping_rounds = 25, eval_metric = "mae", lambda=0, 
                prediction = TRUE, alpha=1)
 
-# Using the xgb.cv function to calculate the best nround for this model. 
-# Note that we intentionally used nrounds = 3 inorder to save some computational time, but for xgb.train we use the optimal nround value of 1101.
+# Using the xgb.cv function to calculate the best nround for this model.
+# Note that we intentionally used nrounds = 3 inorder to save some computational time, 
+#   but for xgb.train we use the optimal nround value of 1101.
 
 xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 3, nfold = 5, 
                  showsd = T, stratified = T, print_every_n = 100, maximize = F,
@@ -415,9 +421,11 @@ xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 3, nfold = 5,
 
 
 # Finding the best nrounds value
-#xgbcv$best_iteration
-# Training the model on the best tuning parameters with nrounds = 1101. 
-# This value is derived based on prior tuning and using it directly on train to save some computation time.
+# xgbcv$best_iteration
+
+# Training the model on the best tuning parameters with nrounds = 1101.
+# This value is derived based on prior tuning and using it directly on train
+#   to save some computation time. 
 
 xgb1 <- xgb.train (params = params, 
                    data = dtrain, 
@@ -430,7 +438,8 @@ xgb1 <- xgb.train (params = params,
 # Model prediction
 xgbpred <- predict(xgb1,dtest)
 
-# Take the antilog of the predictions and subtracting 200 to get the error value in terms of the original loss variable
+# Take the antilog of the predictions and subtracting 200 to get the error value 
+#    in terms of the original loss variable
 preds <- exp(xgbpred)-200
 
 # Checking the accuracy of the the model using MAE
@@ -488,15 +497,18 @@ params <- list(booster = "gbtree", objective = "reg:linear", eta=0.1, gamma=0, n
                early_stopping_rounds = 25, eval_metric = "mae", lambda=0, alpha=1)
 
 # Using the xgb.cv function to calculate the best nround for this model. 
-# Note that we intentionally use nrounds = 3 inorder to save some computational time, but for xgb.train we use the optimal nround value of 1181 determined during prior execution.
+# Note that we intentionally use nrounds = 3 inorder to save some computational time, 
+#  but for xgb.train we use the optimal nround value of 1181 determined during prior execution.
 
 xgbcv <- xgb.cv( params = params, data = dtrain, nrounds = 3, nfold = 5, 
                  showsd = T, stratified = T, print_every_n = 100, maximize = F)
 
 # finding the best nrounds value
 #xgbcv$best_iteration
+
 # Training the model on the best tuning parameters with nrounds = 1181. 
-# This value is derived based on prior tuning and using it directly on train to save some computation time.
+# This value is derived based on prior tuning and using it directly on train 
+#   to save some computation time.
 
 xgb1 <- xgb.train (params = params, 
                    data = dtrain, 
@@ -509,7 +521,8 @@ xgb1 <- xgb.train (params = params,
 # Model prediction
 xgbpred <- predict(xgb1,dtest)
 
-# Taking the antilog of the predictions and subtracting 200 to get the error value in terms of the original loss variable
+# Taking the antilog of the predictions and subtracting 200 to get the error value 
+#   in terms of the original loss variable
 preds <- exp(xgbpred)-200
 
 # Checking the accuracy of the the model using MAE
@@ -546,13 +559,13 @@ mae_results %>% knitr::kable()
 # Conclusion 
  
 
- Accurate prediction of 'loss' holds key importance for Insurance companies, as it helps drive key business decisions and help reduce potential claim processing delays caused during the claims process. It can also help automate some of the manual review and claim adjudication steps reducing the overall claim processing lead time. This will ultimately hold a real value to end customers leading to better customer experience.
+ Accurate prediction of loss or severity is a key important factor for Insurance companies, as it helps drive business decisions and help reduce potential claim processing delays caused during the claims process. It can also help automate some of the manual review and claim adjudication steps reducing the overall claim processing lead time. This will ultimately deliver real business value leading to better overall customer satisfaction.
  
   The application of xgBoost model on raw numeric data achieved the best MAE results. Although PCA data based models yielded slightly less performance, the concept can be applied on multiple scenarios to reduce the data dimension and improve computational and model efficiencies. 
 
 ## Future Impovement
 
- Further improvements can be made to the models if we have the knowledge of the complete data features. For example Demographic information of the Insured, Driving History, Loss by State, date and time etc. will help apply domain knowledge for the modeling. Alternate models like Neural Networks can be looked at, but with the cost of high computational expense.
+ Further improvements to the models can be achieved if we have the knowledge of the complete data features. For example Demographic information of the Insured, Driving History, Loss by State, date and time etc. will help apply domain knowledge for the modeling. Alternate models like Neural Networks can also be considered for future improvement, but with the cost of high computational expense.
 
 
 ### References 
